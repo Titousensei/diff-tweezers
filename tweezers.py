@@ -22,15 +22,20 @@ class FoldingDiff:
     return self
 
   def __next__(self):
-    if self.i >= len(self.lines):
+    i = self.i
+    if i >= len(self.lines):
       raise StopIteration
-    # ~ while self.i in self._folded:
-      # ~ if
-
-    ret = self.lines[self.i]
-    if self.i in self._folded:
-      ret = "> " + ret
     self.i += 1
+
+    ret = self.lines[i]
+    if i in self._folded:
+      ret = "> " + ret
+      try:
+        pos = self.chunks.index(i)
+        self.i = self.chunks[pos + 1]
+      except:
+        pass
+
     return ret
 
   def toggle_fold(self, i):
@@ -62,24 +67,22 @@ class FoldingDiff:
 
 
 def get_style(l):
-  if l.startswith('diff '):
+  if l.startswith('diff ') or l.startswith('> diff '):
     return curses.A_BOLD # COLOR_WHITE
   elif l.startswith('--- '):
     return curses.A_BOLD | curses.color_pair(1) # COLOR_RED
   elif l.startswith('+++ '):
     return curses.A_BOLD | curses.color_pair(2) # COLOR_GREEN
-  elif l.startswith('@@ '):
+  elif l.startswith('@@ ') or l.startswith('> @@ '):
     return curses.A_BOLD | curses.color_pair(4) # COLOR_BLUE
   elif l.startswith('-'):
     return curses.color_pair(1) # COLOR_RED
   elif l.startswith('+'):
     return curses.color_pair(2) # COLOR_GREEN
-  elif not l.startswith('>'):
-    return curses.A_DIM
-  elif l.startswith('diff '):
+  elif l.startswith('>diff '):
     return curses.A_DIM # COLOR_WHITE
-  elif l.startswith('@@ '):
-    return curses.A_DIM | curses.color_pair(4) # COLOR_BLUE
+  elif l.startswith('>@@ '):
+    return curses.color_pair(4) # COLOR_BLUE
   return curses.A_DIM
 
 
