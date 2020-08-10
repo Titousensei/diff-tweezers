@@ -9,24 +9,27 @@ import sys
 #   - chunk "@@"
 #     - lines
 
-class Diff:
+class FoldingDiff:
   def __init__(self, lines, files, chunks):
     self.lines = lines
     self.files = files
     self.chunks = chunks
-    self.folded = set()
+    self._folded = set()
+    self.offset = 0
 
   def __iter__(self):
     self.i = 0
     return self
 
   def __next__(self):
-    ret = self.i
+    if self.i >= len(self.lines):
+      raise StopIteration
+    ret = self.lines[self.i]
     self.i += 1
     return ret
 
   @classmethod
-  def from_file(cls.path):
+  def from_file(cls, path):
     lines = []
     files = []
     chunks = []
@@ -38,7 +41,7 @@ class Diff:
         elif l.startswith('@@ '):
           chunks.append(i)
 
-    return Diff(lines, files, chunks)
+    return cls(lines, files, chunks)
 
 
 def get_style(l):
@@ -56,6 +59,7 @@ def get_style(l):
     return curses.color_pair(2) # COLOR_GREEN
   return curses.A_DIM
 
+
 def main(scr):
   curses.noecho()
   # make curses give nice values (such as curses.KEY_LEFT)
@@ -71,27 +75,26 @@ def main(scr):
   curses.init_pair(7, curses.COLOR_WHITE, curses.COLOR_BLACK)
 
   diff_path = sys.argv[1]
-  lines, files, chunks = load_diff_from_file(diff_path)
-  offset = 0
+  d = FoldingDiff.from_file(diff_path)
 
   y = 1
   while True:
     # First, clear the screen
     scr.erase()
-
     my, mx = scr.getmaxyx()
 
     # print on screen here
     scr.border(0)
-    scr.addstr(0, 4, f"[{diff_path[-20:]}] {offset} {y}")
+    scr.addstr(0, 4, f"[{diff_path[-20:]}] /{mx} {y}/{my}")
 
-    for i0 in range(my-2):
-      i = i0 + offset
-      line = lines[i]
+    for i, line in enumerate(d, 1):
+      if i > my - 2:
+        scr.addstr(1, 20, f"*{i}>{my - 2}*")
+        break
       style = get_style(line)
       if len(line) > mx - 2:
         line = line[:mx - 2] + ">"
-      scr.addstr(i0 + 1, 1, line, style)
+      scr.addstr(i, 1, line, style)
 
     scr.move(y,1)
 
@@ -108,8 +111,8 @@ def main(scr):
     elif c == curses.KEY_DOWN:
       if y < my - 5:
         y += 1
+        scr.move(y,1)
       else:
-        offset += 1
-      scr.move(y,1)
+        d.offset += 1
 
 curses.wrapper(main)
