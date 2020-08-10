@@ -18,7 +18,7 @@ class FoldingDiff:
     self.offset = 0
 
   def __iter__(self):
-    self.i = 0
+    self.i = self.offset
     return self
 
   def __next__(self):
@@ -89,7 +89,6 @@ def main(scr):
 
     for i, line in enumerate(d, 1):
       if i > my - 2:
-        scr.addstr(1, 20, f"*{i}>{my - 2}*")
         break
       style = get_style(line)
       if len(line) > mx - 2:
@@ -105,14 +104,38 @@ def main(scr):
     c = scr.getch()
     if c == ord('q'):
       break  # Exit the while loop
-    elif c == curses.KEY_UP and y > 1:
-      y -= 1
-      scr.move(y,1)
+    elif c == ord('c'):
+      break  # execute cut
+    elif c == ord(' '):
+      # select
+      pass
+    elif c == curses.KEY_UP:
+      if y > 1:
+        y -= 1
+        scr.move(y,1)
+      else:
+        d.offset -= 1
     elif c == curses.KEY_DOWN:
       if y < my - 5:
         y += 1
         scr.move(y,1)
       else:
         d.offset += 1
+    elif c == curses.KEY_HOME:
+      pass
+    elif c == curses.KEY_END:
+      pass
+    elif c == curses.KEY_PPAGE:
+      if d.offset >= my:
+        d.offset -= my
+      else:
+        d.offset = 0
+        y = 1
+    elif c == curses.KEY_NPAGE:
+      d.offset += my
+    elif c == curses.KEY_LEFT:
+      pass
+    elif c == curses.KEY_RIGHT:
+      pass
 
 curses.wrapper(main)
