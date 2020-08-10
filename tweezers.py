@@ -24,9 +24,26 @@ class FoldingDiff:
   def __next__(self):
     if self.i >= len(self.lines):
       raise StopIteration
+    # ~ while self.i in self._folded:
+      # ~ if
+
     ret = self.lines[self.i]
+    if self.i in self._folded:
+      ret = "> " + ret
     self.i += 1
     return ret
+
+  def toggle_fold(self, i):
+    i = i + self.offset - 1
+    l = self.lines[i]
+    while not (l.startswith('diff ') or l.startswith('@@ ')):
+      i -= 1
+      l = self.lines[i]
+    if i in self._folded:
+      self._folded.remove(i)
+    else:
+      self._folded.add(i)
+    return i - self.offset + 1
 
   @classmethod
   def from_file(cls, path):
@@ -57,6 +74,12 @@ def get_style(l):
     return curses.color_pair(1) # COLOR_RED
   elif l.startswith('+'):
     return curses.color_pair(2) # COLOR_GREEN
+  elif not l.startswith('>'):
+    return curses.A_DIM
+  elif l.startswith('diff '):
+    return curses.A_DIM # COLOR_WHITE
+  elif l.startswith('@@ '):
+    return curses.A_DIM | curses.color_pair(4) # COLOR_BLUE
   return curses.A_DIM
 
 
@@ -107,7 +130,6 @@ def main(scr):
     elif c == ord('c'):
       break  # execute cut
     elif c == ord(' '):
-      # select
       pass
     elif c == curses.KEY_UP:
       if y > 1:
@@ -133,9 +155,7 @@ def main(scr):
         y = 1
     elif c == curses.KEY_NPAGE:
       d.offset += my
-    elif c == curses.KEY_LEFT:
-      pass
-    elif c == curses.KEY_RIGHT:
-      pass
+    elif c == curses.KEY_LEFT or c == curses.KEY_RIGHT:
+      y = d.toggle_fold(y)
 
 curses.wrapper(main)
