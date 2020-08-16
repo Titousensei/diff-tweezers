@@ -15,6 +15,7 @@ class FoldingDiff:
     self.files = files
     self.chunks = chunks
     self._folded = set()
+    self._selected = set()
     self.offset = 0
 
   def __iter__(self):
@@ -29,17 +30,21 @@ class FoldingDiff:
 
     ret = self.lines[i]
     if i in self._folded:
-      ret = "> " + ret
+      ret = ">" + ret
       try:
         pos = self.chunks.index(i)
         self.i = self.chunks[pos + 1]
       except:
         pass
+    elif i in self._selected:
+      ret = ">" + ret
+    else:
+      ret = " " + ret
 
-    return ret
+    return ret, i
 
-  def toggle_fold(self, i):
-    i = i + self.offset - 1
+  def toggle_fold(self, orig_i):
+    i = orig_i
     l = self.lines[i]
     while not (l.startswith('diff ') or l.startswith('@@ ')):
       i -= 1
@@ -48,7 +53,13 @@ class FoldingDiff:
       self._folded.remove(i)
     else:
       self._folded.add(i)
-    return i - self.offset + 1
+    return orig_i - i
+
+  def toggle_select(self, i):
+    if i in self._selected:
+      self._selected.remove(i)
+    else:
+      self._selected.add(i)
 
   @classmethod
   def from_file(cls, path):
@@ -67,22 +78,18 @@ class FoldingDiff:
 
 
 def get_style(l):
-  if l.startswith('diff ') or l.startswith('> diff '):
+  if l.startswith(' diff ') or l.startswith('>diff '):
     return curses.A_BOLD # COLOR_WHITE
-  elif l.startswith('--- '):
+  elif l.startswith(' --- '):
     return curses.A_BOLD | curses.color_pair(1) # COLOR_RED
-  elif l.startswith('+++ '):
+  elif l.startswith(' +++ '):
     return curses.A_BOLD | curses.color_pair(2) # COLOR_GREEN
-  elif l.startswith('@@ ') or l.startswith('> @@ '):
+  elif l.startswith(' @@ ') or l.startswith('>@@ '):
     return curses.A_BOLD | curses.color_pair(4) # COLOR_BLUE
-  elif l.startswith('-'):
+  elif l.startswith(' -'):
     return curses.color_pair(1) # COLOR_RED
-  elif l.startswith('+'):
+  elif l.startswith(' +'):
     return curses.color_pair(2) # COLOR_GREEN
-  elif l.startswith('>diff '):
-    return curses.A_DIM # COLOR_WHITE
-  elif l.startswith('>@@ '):
-    return curses.color_pair(4) # COLOR_BLUE
   return curses.A_DIM
 
 
@@ -103,25 +110,30 @@ def main(scr):
   diff_path = sys.argv[1]
   d = FoldingDiff.from_file(diff_path)
 
-  y = 1
+  cur_y = 0
   while True:
     # First, clear the screen
     scr.erase()
     my, mx = scr.getmaxyx()
+    mx -= 2
+    my -= 2
 
     # print on screen here
     scr.border(0)
-    scr.addstr(0, 4, f"[{diff_path[-20:]}] /{mx} {y}/{my}")
 
-    for i, line in enumerate(d, 1):
-      if i > my - 2:
+    row_index = []
+    for i, (line, j) in enumerate(d):
+      if i >= my:
         break
       style = get_style(line)
-      if len(line) > mx - 2:
-        line = line[:mx - 2] + ">"
-      scr.addstr(i, 1, line, style)
+      if len(line) > mx:
+        line = line[:mx] + ">"
+      row_index.append(j)
+      scr.addstr(i + 1, 1, line + f' <{j}', style)
 
-    scr.move(y,1)
+    scr.addstr(0, 4, f"[{diff_path[-20:]}] /{mx} {cur_y}/{my} {row_index[cur_y]}")
+
+    scr.move(cur_y + 1, 1)
 
     # Draw the screen
     scr.refresh()
@@ -135,15 +147,15 @@ def main(scr):
     elif c == ord(' '):
       pass
     elif c == curses.KEY_UP:
-      if y > 1:
-        y -= 1
-        scr.move(y,1)
-      else:
+      if cur_y > 0:
+        cur_y -= 1
+        scr.move(cur_y + 1, 1)
+      elif d.offset > 0:
         d.offset -= 1
     elif c == curses.KEY_DOWN:
-      if y < my - 5:
-        y += 1
-        scr.move(y,1)
+      if cur_y < my - 5:
+        cur_y += 1
+        scr.move(cur_y + 1, 1)
       else:
         d.offset += 1
     elif c == curses.KEY_HOME:
@@ -155,10 +167,10 @@ def main(scr):
         d.offset -= my
       else:
         d.offset = 0
-        y = 1
+        cur_y = 0
     elif c == curses.KEY_NPAGE:
       d.offset += my
     elif c == curses.KEY_LEFT or c == curses.KEY_RIGHT:
-      y = d.toggle_fold(y)
+      cur_y -= d.toggle_fold(row_index[cur_y])
 
 curses.wrapper(main)
