@@ -37,11 +37,8 @@ class FoldingDiff:
       except:
         pass
     elif i in self._selected:
-      ret = ">" + ret
-    else:
-      ret = " " + ret
-
-    return ret, i
+      return ret, i, True
+    return ret, i, False
 
   def toggle_fold(self, orig_i):
     i = orig_i
@@ -78,17 +75,17 @@ class FoldingDiff:
 
 
 def get_style(l):
-  if l.startswith(' diff ') or l.startswith('>diff '):
+  if l.startswith('diff ') or l.startswith('>diff '):
     return curses.A_BOLD # COLOR_WHITE
-  elif l.startswith(' --- '):
+  elif l.startswith('--- '):
     return curses.A_BOLD | curses.color_pair(1) # COLOR_RED
-  elif l.startswith(' +++ '):
+  elif l.startswith('+++ '):
     return curses.A_BOLD | curses.color_pair(2) # COLOR_GREEN
-  elif l.startswith(' @@ ') or l.startswith('>@@ '):
+  elif l.startswith('@@ ') or l.startswith('>@@ '):
     return curses.A_BOLD | curses.color_pair(4) # COLOR_BLUE
-  elif l.startswith(' -'):
+  elif l.startswith('-'):
     return curses.color_pair(1) # COLOR_RED
-  elif l.startswith(' +'):
+  elif l.startswith('+'):
     return curses.color_pair(2) # COLOR_GREEN
   return curses.A_DIM
 
@@ -122,7 +119,7 @@ def main(scr):
     scr.border(0)
 
     row_index = []
-    for i, (line, j) in enumerate(d):
+    for i, (line, j, selected) in enumerate(d):
       if i >= my:
         break
       style = get_style(line)
@@ -130,6 +127,8 @@ def main(scr):
         line = line[:mx] + ">"
       row_index.append(j)
       scr.addstr(i + 1, 1, line + f' <{j}', style)
+      if selected:
+        scr.addstr(i + 1, 0, "+")
 
     scr.addstr(0, 4, f"[{diff_path[-20:]}] /{mx} {cur_y}/{my} {row_index[cur_y]}")
 
@@ -145,7 +144,7 @@ def main(scr):
     elif c == ord('c'):
       break  # execute cut
     elif c == ord(' '):
-      pass
+      d.toggle_select(row_index[cur_y])
     elif c == curses.KEY_UP:
       if cur_y > 0:
         cur_y -= 1
