@@ -36,16 +36,28 @@ class FoldingDiff:
         self.i = self.chunks[pos + 1]
       except:
         pass
-    elif i in self._selected:
-      return ret, i, True
-    return ret, i, False
+    return ret, i, (i in self._selected)
+
+  def is_foldable(self, i):
+      l = self.lines[i]
+      return l.startswith('diff ') or l.startswith('@@ ')
+
+  def find_foldable_before(self, i):
+    while i > 0 and not self.is_foldable(i):
+      i -= 1
+    return i
+
+  def find_foldable_after(self, i):
+    m = len(self.lines)
+    while i < m and not self.is_foldable(i):
+      i += 1
+    return i
 
   def toggle_fold(self, orig_i):
-    i = orig_i
-    l = self.lines[i]
-    while not (l.startswith('diff ') or l.startswith('@@ ')):
-      i -= 1
-      l = self.lines[i]
+    if self.is_foldable(orig_i):
+      i = orig_i
+    else:
+      i = self.find_foldable_before(orig_i)
     if i in self._folded:
       self._folded.remove(i)
     else:
@@ -128,7 +140,7 @@ def main(scr):
       row_index.append(j)
       scr.addstr(i + 1, 1, line + f' <{j}', style)
       if selected:
-        scr.addstr(i + 1, 0, "+")
+        scr.addstr(i + 1, 0, "=")
 
     scr.addstr(0, 4, f"[{diff_path[-20:]}] /{mx} {cur_y}/{my} {row_index[cur_y]}")
 
@@ -143,6 +155,8 @@ def main(scr):
       break  # Exit the while loop
     elif c == ord('c'):
       break  # execute cut
+    elif c == ord('\t'):
+      cur_y -= d.toggle_fold(row_index[cur_y])
     elif c == ord(' '):
       d.toggle_select(row_index[cur_y])
     elif c == curses.KEY_UP:
@@ -158,7 +172,8 @@ def main(scr):
       else:
         d.offset += 1
     elif c == curses.KEY_HOME:
-      pass
+        d.offset = 0
+        cur_y = 0
     elif c == curses.KEY_END:
       pass
     elif c == curses.KEY_PPAGE:
@@ -169,7 +184,9 @@ def main(scr):
         cur_y = 0
     elif c == curses.KEY_NPAGE:
       d.offset += my
-    elif c == curses.KEY_LEFT or c == curses.KEY_RIGHT:
-      cur_y -= d.toggle_fold(row_index[cur_y])
+    elif c == curses.KEY_LEFT:
+      y = d.find_foldable_before(row_index[cur_y])
+    elif c == curses.KEY_RIGHT:
+      y = d.find_foldable_after(row_index[cur_y])
 
 curses.wrapper(main)
