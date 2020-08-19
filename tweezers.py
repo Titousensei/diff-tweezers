@@ -9,6 +9,12 @@ import sys
 #   - chunk "@@"
 #     - lines
 
+PREFIX_FOLDED = '>'
+PREFIX_CHUNK = "@@ "
+PREFIX_DIFF = "diff "
+FOLDED_CHUNK = PREFIX_FOLDED + PREFIX_CHUNK
+FOLDED_DIFF = PREFIX_FOLDED + PREFIX_DIFF
+
 class FoldingDiff:
   def __init__(self, lines, files, chunks):
     self.lines = lines
@@ -30,17 +36,23 @@ class FoldingDiff:
 
     ret = self.lines[i]
     if i in self._folded:
-      ret = ">" + ret
+      ret = PREFIX_FOLDED + ret
       try:
-        pos = self.chunks.index(i)
-        self.i = self.chunks[pos + 1]
-      except:
+        if ret.startswith(FOLDED_DIFF):
+          pos = self.files.index(i)
+          self.i = self.files[pos + 1]
+        else:
+          pos = self.chunks.index(i)
+          self.i = self.chunks[pos + 1]
+      except IndexError:
+        self.i = len(self.lines)
+      except Exception as ex:
         pass
     return ret, i, (i in self._selected)
 
   def is_foldable(self, i):
       l = self.lines[i]
-      return l.startswith('diff ') or l.startswith('@@ ')
+      return l.startswith(PREFIX_DIFF) or l.startswith(PREFIX_CHUNK)
 
   def find_foldable_before(self, i):
     while i > 0 and not self.is_foldable(i):
@@ -78,22 +90,22 @@ class FoldingDiff:
     with open(path) as f:
       for i, l in enumerate(f):
         lines.append(l[:-1])
-        if l.startswith('diff '):
+        if l.startswith(PREFIX_DIFF):
           files.append(i)
-        elif l.startswith('@@ '):
+        elif l.startswith(PREFIX_CHUNK):
           chunks.append(i)
 
     return cls(lines, files, chunks)
 
 
 def get_style(l):
-  if l.startswith('diff ') or l.startswith('>diff '):
+  if l.startswith(PREFIX_DIFF) or l.startswith(FOLDED_DIFF):
     return curses.A_BOLD # COLOR_WHITE
   elif l.startswith('--- '):
     return curses.A_BOLD | curses.color_pair(1) # COLOR_RED
   elif l.startswith('+++ '):
     return curses.A_BOLD | curses.color_pair(2) # COLOR_GREEN
-  elif l.startswith('@@ ') or l.startswith('>@@ '):
+  elif l.startswith(PREFIX_CHUNK) or l.startswith(FOLDED_CHUNK):
     return curses.A_BOLD | curses.color_pair(4) # COLOR_BLUE
   elif l.startswith('-'):
     return curses.color_pair(1) # COLOR_RED
@@ -136,7 +148,7 @@ def main(scr):
         break
       style = get_style(line)
       if len(line) > mx:
-        line = line[:mx] + ">"
+        line = line[:mx] + PREFIX_FOLDED
       row_index.append(j)
       scr.addstr(i + 1, 1, line + f' <{j}', style)
       if selected:
