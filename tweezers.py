@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+from diff_parser import parse_diff
 from collections import namedtuple
 import curses
 import sys
@@ -148,7 +149,7 @@ def main(scr):
     curses.init_pair(7, curses.COLOR_WHITE, curses.COLOR_BLACK)
 
     diff_path = sys.argv[1]
-    d = FoldingDiff.from_file(diff_path)
+    d = parse_diff(diff_path)
 
     cur_y = 0
     while True:
