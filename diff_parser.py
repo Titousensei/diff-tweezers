@@ -75,28 +75,42 @@ class FoldingDiff(FoldingPart):
         return "*** FoldingDiff\n" + "\n".join(self.labels) + "\n" + "\n".join(str(x) for x in self.files)
 
 def parse_diff(path):
-    file = None
-    chunk = None
-    lines = []
     ret = FoldingDiff(path)
+
+    current_file = None
+    current_chunk = None
+
     with open(path) as f:
         for i, line in enumerate(f):
-            line = line.strip()
-            try:
-                if line.startswith(PREFIX_DIFF):
-                    ret._add_file(line)
-                elif line.startswith(PREFIX_PLUS) or line.startswith(PREFIX_MINUS):
-                    ret._add_label(line)
-                elif line.startswith(PREFIX_CHUNK):
-                    ret._add_chunk(line)
+            line = line.rstrip("\n")
+
+            if line.startswith(PREFIX_DIFF):
+                ret._add_file(line)
+                current_file = ret.files[-1]
+                current_chunk = None
+
+            elif line.startswith(PREFIX_MINUS) and current_chunk is None:
+                # --- file header
+                ret._add_label(line)
+
+            elif line.startswith(PREFIX_PLUS) and current_chunk is None:
+                # +++ file header
+                ret._add_label(line)
+
+            elif line.startswith(PREFIX_CHUNK):
+                ret._add_chunk(line)
+                current_chunk = current_file.chunks[-1]
+
+            else:
+                # Inside chunk content
+                if current_chunk is not None:
+                    current_chunk._add_line(line)
                 else:
-                    ret._add_line(line)
-            except Exception as ex:
-                print("ERROR -", ex, "at line", i, line)
-                raise
+                    ret._add_label(line)
+
     return ret
 
 
-
-diff_obj = parse_diff(sys.argv[1])
-print(diff_obj)
+if __name__ == '__main__':
+    diff_obj = parse_diff(sys.argv[1])
+    print(diff_obj)
