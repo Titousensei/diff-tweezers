@@ -2,7 +2,11 @@
 
 from collections import namedtuple
 import curses
+import re
 import sys
+
+HUNK_RE = re.compile(r"@@ -(\d+),(\d+) \+(\d+),(\d+) @@")
+
 
 # Diff struct:
 # - file ("diff", "---", "+++")
@@ -74,6 +78,7 @@ class FoldingDiff(FoldingPart):
     def __str__(self):
         return "*** FoldingDiff\n" + "\n".join(self.labels) + "\n" + "\n".join(str(x) for x in self.files)
 
+
 def parse_diff(path):
     ret = FoldingDiff(path)
 
@@ -109,6 +114,96 @@ def parse_diff(path):
                     ret._add_label(line)
 
     return ret
+
+
+# -----------------------------
+# Writing Split Diffs
+# -----------------------------
+
+def write_split(diff, file_a_path, file_b_path):
+    with open(file_a_path, "w") as fa, open(file_b_path, "w") as fb:
+
+        for file in diff.files:
+
+            has_left = any(not c.is_selected for c in file.chunks)
+            has_right = any(c.is_selected for c in file.chunks)
+
+            if has_left:
+                write_file_block(fa, file, include_selected=False)
+
+            if has_right:
+                write_file_block(fb, file, include_selected=True)
+
+
+def write_file_block(out, file, include_selected):
+    """
+    include_selected=True  -> right.patch
+    include_selected=False -> left.patch
+    """
+
+    # Write file headers once
+    wrote_header = False
+
+    cumulative_delta = 0
+
+    for chunk in file.chunks:
+
+        belongs = chunk.is_selected == include_selected
+
+        original_header = chunk.labels[0]
+        old_start, old_len, new_start, new_len = parse_hunk_header(original_header)
+
+        if belongs:
+            if not wrote_header:
+                for label in file.labels:
+                    out.write(label + "\n")
+                wrote_header = True
+
+            adj_old_start = old_start + cumulative_delta
+            adj_new_start = new_start + cumulative_delta
+
+            real_old_len, real_new_len, delta = compute_chunk_stats(chunk)
+
+            new_header = (
+                f"@@ -{adj_old_start},{real_old_len} "
+                f"+{adj_new_start},{real_new_len} @@"
+            )
+
+            out.write(new_header + "\n")
+
+            for line in chunk.lines:
+                out.write(line + "\n")
+
+            cumulative_delta += delta
+
+        else:
+            # Important: do NOT change cumulative_delta
+            # because this chunk does not exist in this patch.
+            pass
+
+
+def parse_hunk_header(header):
+    m = HUNK_RE.search(header)
+    if not m:
+        raise ValueError(f"Invalid hunk header: {header}")
+    return tuple(map(int, m.groups()))
+
+
+def compute_chunk_stats(chunk):
+    old_len = 0
+    new_len = 0
+
+    for line in chunk.lines:
+        if line.startswith("-"):
+            old_len += 1
+        elif line.startswith("+"):
+            new_len += 1
+        else:
+            old_len += 1
+            new_len += 1
+
+    delta = new_len - old_len
+    return old_len, new_len, delta
 
 
 if __name__ == '__main__':

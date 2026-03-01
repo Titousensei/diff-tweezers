@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tweezers-diff"
+version = "0.1.0"
+description = "Interactive terminal diff chunk splitter"
+authors = [
+  { name="Your Name", email="your@email.com" }
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+tweezers = "tweezers.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["tweezers"]

@@ -2,8 +2,14 @@
 
 import curses
 import sys
-from diff_parser import parse_diff
-
+from diff_parser import (
+    compute_chunk_stats,
+    compute_chunk_stats,
+    parse_diff,
+    parse_hunk_header,
+    write_file_block,
+    write_split,
+)
 
 # -----------------------------
 # Rendering Helpers
@@ -37,61 +43,34 @@ def flatten(diff):
     rows = []
 
     for file in diff.files:
+
+        if file.is_folded:
+            # Only show the first label (diff line)
+            if file.labels:
+                rows.append((file, file.labels[0], 0))
+            continue
+
+        # Unfolded: show all labels
         for label in file.labels:
             rows.append((file, label, 0))
 
-        if not file.is_folded:
-            for chunk in file.chunks:
-                for label in chunk.labels:
-                    rows.append((chunk, label, 1))
+        for chunk in file.chunks:
 
-                if not chunk.is_folded:
-                    for line in chunk.lines:
-                        rows.append((chunk, line, 2))
+            rows.append((chunk, chunk.labels[0], 1))
+
+            if not chunk.is_folded:
+                for line in chunk.lines:
+                    rows.append((chunk, line, 2))
 
     return rows
 
-
-# -----------------------------
-# Writing Split Diffs
-# -----------------------------
-
-def write_split(diff, file_a_path, file_b_path):
-    """
-    file_a: unselected chunks
-    file_b: selected chunks
-    """
-
-    with open(file_a_path, "w") as fa, open(file_b_path, "w") as fb:
-
-        for file in diff.files:
-
-            chunks_a = [c for c in file.chunks if not c.is_selected]
-            chunks_b = [c for c in file.chunks if c.is_selected]
-
-            if chunks_a:
-                write_file_block(fa, file, chunks_a)
-
-            if chunks_b:
-                write_file_block(fb, file, chunks_b)
-
-
-def write_file_block(out, file, chunks):
-    for label in file.labels:
-        out.write(label + "\n")
-
-    for chunk in chunks:
-        for label in chunk.labels:
-            out.write(label + "\n")
-        for line in chunk.lines:
-            out.write(line + "\n")
 
 
 # -----------------------------
 # Curses UI
 # -----------------------------
 
-def main(scr):
+def run_ui(scr, diff_path, output_prefix):
     curses.noecho()
     curses.cbreak()
     scr.keypad(True)
@@ -172,13 +151,46 @@ def main(scr):
             if hasattr(obj, "lines"):
                 obj.is_selected = not obj.is_selected
 
-        elif c == ord("\t"):
+        elif c == curses.KEY_RIGHT:
             obj, _, _ = rows[offset + cursor]
-            if hasattr(obj, "is_folded"):
-                obj.is_folded = not obj.is_folded
+
+            if hasattr(obj, "is_folded") and obj.is_folded:
+                obj.is_folded = False
+
+        elif c == curses.KEY_LEFT:
+            obj, _, _ = rows[offset + cursor]
+
+            if hasattr(obj, "is_folded") and not obj.is_folded:
+
+                # Find header index BEFORE folding
+                header_index = None
+                for idx, (o, _, level) in enumerate(rows):
+                    if o is obj and level in (0, 1):
+                        header_index = idx
+                        break
+
+                obj.is_folded = True
+
+                # Recompute rows after folding
+                rows = flatten(diff)
+
+                if header_index is not None:
+                    # Move cursor to header position
+                    if header_index < offset:
+                        offset = header_index
+                        cursor = 0
+                    elif header_index >= offset + max_y:
+                        offset = header_index - max_y + 1
+                        cursor = max_y - 1
+                    else:
+                        cursor = header_index - offset
 
         elif c == ord("c"):
-            write_split(diff, "left.patch", "right.patch")
+            write_split(
+                diff,
+                f"{output_prefix}-left.patch",
+                f"{output_prefix}-right.patch"
+            )
             break
 
         elif c == curses.KEY_UP:
