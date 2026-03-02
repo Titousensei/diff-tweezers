@@ -35,6 +35,20 @@ def get_style(line):
     return curses.A_DIM
 
 
+def get_current_file(rows, offset, diff):
+    obj, _, _ = rows[offset]
+
+    # If it's a file, return it
+    if hasattr(obj, "chunks"):
+        return obj
+
+    # Otherwise find its parent file
+    for f in diff.files:
+        if obj in f.chunks:
+            return f
+
+    return None
+
 # -----------------------------
 # Flatten Structured Diff
 # -----------------------------
@@ -64,8 +78,6 @@ def flatten(diff):
 
     return rows
 
-
-
 # -----------------------------
 # Curses UI
 # -----------------------------
@@ -92,6 +104,7 @@ def run_ui(scr, diff_path, output_prefix):
     offset = 0
     cursor = 0
     last_key = None
+    sticky_file = None
 
     while True:
         scr.erase()
@@ -102,7 +115,18 @@ def run_ui(scr, diff_path, output_prefix):
         scr.border(0)
 
         rows = flatten(diff)
-        visible = rows[offset:offset + max_y]
+        sticky_file = get_current_file(rows, offset, diff)
+
+        # Reserve one line for sticky header
+        visible = rows[offset:offset + max_y - 1]
+
+        if sticky_file:
+            sticky_line = sticky_file.labels[0]
+
+            if len(sticky_line) > max_x:
+                sticky_line = sticky_line[:max_x]
+
+            scr.addstr(1, 3, sticky_line, curses.A_REVERSE | curses.A_BOLD)
 
         selected_count = sum(
             1
@@ -127,7 +151,7 @@ def run_ui(scr, diff_path, output_prefix):
                 text = text[:max_x]
 
             style = get_style(line)
-            scr.addstr(i + 1, 1, text, style)
+            scr.addstr(i + 2, 1, text, style)
 
             if getattr(obj, "is_selected", False):
                 scr.addstr(i + 1, 0, "=")
@@ -139,7 +163,7 @@ def run_ui(scr, diff_path, output_prefix):
 
         scr.addstr(0, 2, status[:max_x])
 
-        scr.move(cursor + 1, 1)
+        scr.move(cursor + 2, 1)
         scr.refresh()
 
         c = scr.getch()
