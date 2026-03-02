@@ -98,7 +98,7 @@ def main():
     parser.add_argument(
         "--version",
         action="version",
-        version="tweezers 0.1.0"
+        version="tweezers 0.2.0"
     )
     parser.add_argument("--git", action="store_true")
     args = parser.parse_args()
