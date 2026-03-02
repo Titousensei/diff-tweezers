@@ -206,6 +206,92 @@ def compute_chunk_stats(chunk):
     return old_len, new_len, delta
 
 
+def build_chunk(old_start, new_start, lines):
+    old_len = 0
+    new_len = 0
+
+    for line in lines:
+        if line.startswith('-'):
+            old_len += 1
+        elif line.startswith('+'):
+            new_len += 1
+        else:
+            old_len += 1
+            new_len += 1
+
+    header = f"@@ -{old_start},{old_len} +{new_start},{new_len} @@"
+
+    new_chunk = FoldingChunk(header)
+    new_chunk.lines = lines.copy()
+
+    return new_chunk
+
+
+def split_chunk(file, chunk):
+
+    header = chunk.labels[0]
+    old_start, old_len, new_start, new_len = parse_hunk_header(header)
+
+    segments = []
+    current = []
+    current_type = None
+
+    for line in chunk.lines:
+        t = "mod" if line.startswith('-') or line.startswith('+') else "ctx"
+
+        if current_type is None:
+            current_type = t
+
+        if t != current_type:
+            segments.append((current_type, current))
+            current = []
+            current_type = t
+
+        current.append(line)
+
+    segments.append((current_type, current))
+
+    # Now build new chunks
+    new_chunks = []
+    consumed_old = 0
+    consumed_new = 0
+
+    buffer = []
+
+    for i, (typ, seg) in enumerate(segments):
+
+        if typ == "ctx" and i > 0 and i < len(segments) - 1:
+            # split boundary
+            if buffer:
+                new_chunks.append(build_chunk(
+                    old_start + consumed_old,
+                    new_start + consumed_new,
+                    buffer
+                ))
+
+                # update consumed counts
+                for line in buffer:
+                    if not line.startswith('+'):
+                        consumed_old += 1
+                    if not line.startswith('-'):
+                        consumed_new += 1
+
+                buffer = []
+
+        buffer.extend(seg)
+
+    if buffer:
+        new_chunks.append(build_chunk(
+            old_start + consumed_old,
+            new_start + consumed_new,
+            buffer
+        ))
+
+    # Replace chunk
+    idx = file.chunks.index(chunk)
+    file.chunks[idx:idx+1] = new_chunks
+
+
 if __name__ == '__main__':
     diff_obj = parse_diff(sys.argv[1])
     print(diff_obj)

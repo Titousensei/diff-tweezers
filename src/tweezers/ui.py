@@ -7,6 +7,7 @@ from diff_parser import (
     compute_chunk_stats,
     parse_diff,
     parse_hunk_header,
+    split_chunk,
     write_file_block,
     write_split,
 )
@@ -35,19 +36,23 @@ def get_style(line):
     return curses.A_DIM
 
 
+def find_parent_file(diff, chunk):
+    for f in diff.files:
+        if chunk in f.chunks:
+            return f
+            
+    return None
+
+
 def get_current_file(rows, offset, diff):
     obj, _, _ = rows[offset]
 
     # If it's a file, return it
     if hasattr(obj, "chunks"):
         return obj
+        
+    return find_parent_file(diff, obj)
 
-    # Otherwise find its parent file
-    for f in diff.files:
-        if obj in f.chunks:
-            return f
-
-    return None
 
 # -----------------------------
 # Flatten Structured Diff
@@ -154,7 +159,7 @@ def run_ui(scr, diff_path, output_prefix):
             scr.addstr(i + 2, 1, text, style)
 
             if getattr(obj, "is_selected", False):
-                scr.addstr(i + 1, 0, "=")
+                scr.addstr(i + 2, 0, "=")
 
         status = (
             f"[space] select  [tab] fold  [c] cut  [q] quit"
@@ -225,12 +230,12 @@ def run_ui(scr, diff_path, output_prefix):
         # Actions
         # -------------------------
 
-        elif c == ord(" "):
+        elif c == ord(' '):
             obj, _, _ = rows[offset + cursor]
             if hasattr(obj, "lines"):
                 obj.is_selected = not obj.is_selected
 
-        elif c == ord("c"):
+        elif c == ord('c'):
             write_split(
                 diff,
                 f"{output_prefix}-left.patch",
@@ -238,6 +243,12 @@ def run_ui(scr, diff_path, output_prefix):
             )
             break
 
+        elif c == ord('s'):
+            obj, _, _ = rows[offset + cursor]
+            if hasattr(obj, "lines"):  # chunk
+                parent_file = find_parent_file(diff, obj)
+                split_chunk(parent_file, obj)
+        
         # -------------------------
         # Fold control
         # -------------------------

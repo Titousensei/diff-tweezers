@@ -3,11 +3,11 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tweezers-diff"
+name = "diff-tweezers"
 version = "0.1.0"
 description = "Interactive terminal diff chunk splitter"
 authors = [
-  { name="Your Name", email="your@email.com" }
+  { name="Eric Gaudet", email="gaudeteric@email.com" }
 ]
 license = { text = "MIT" }
 readme = "README.md"
