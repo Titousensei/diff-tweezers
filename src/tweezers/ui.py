@@ -91,6 +91,7 @@ def run_ui(scr, diff_path, output_prefix):
 
     offset = 0
     cursor = 0
+    last_key = None
 
     while True:
         scr.erase()
@@ -143,23 +144,87 @@ def run_ui(scr, diff_path, output_prefix):
 
         c = scr.getch()
 
-        if c == ord("q"):
+        # -------------------------
+        # Vim double-key handling
+        # -------------------------
+
+        if last_key == ord('g') and c == ord('g'):
+            offset = 0
+            cursor = 0
+            last_key = None
+            continue
+
+        if c == ord('g'):
+            last_key = ord('g')
+            continue
+        else:
+            last_key = None
+
+        # -------------------------
+        # Quit
+        # -------------------------
+
+        if c == ord('q'):
             break
+
+        # -------------------------
+        # Movement (Arrow + Vim)
+        # -------------------------
+
+        elif c == curses.KEY_UP or c == ord('k'):
+            if cursor > 0:
+                cursor -= 1
+            elif offset > 0:
+                offset -= 1
+
+        elif c == curses.KEY_DOWN or c == ord('j'):
+            if cursor < len(rows) - offset - 1 and cursor < max_y - 1:
+                cursor += 1
+            elif offset + max_y < len(rows):
+                offset += 1
+
+        elif c == curses.KEY_NPAGE or c == 4:  # Ctrl-d
+            offset = min(offset + max_y // 2, max(0, len(rows) - max_y))
+
+        elif c == curses.KEY_PPAGE or c == 21:  # Ctrl-u
+            offset = max(offset - max_y // 2, 0)
+
+        elif c == curses.KEY_HOME:
+            offset = 0
+            cursor = 0
+
+        elif c == curses.KEY_END or c == ord('G'):
+            offset = max(0, len(rows) - max_y)
+            cursor = min(max_y - 1, len(rows) - 1)
+
+        # -------------------------
+        # Actions
+        # -------------------------
 
         elif c == ord(" "):
             obj, _, _ = rows[offset + cursor]
             if hasattr(obj, "lines"):
                 obj.is_selected = not obj.is_selected
 
-        elif c == curses.KEY_RIGHT:
-            obj, _, _ = rows[offset + cursor]
+        elif c == ord("c"):
+            write_split(
+                diff,
+                f"{output_prefix}-left.patch",
+                f"{output_prefix}-right.patch"
+            )
+            break
 
+        # -------------------------
+        # Fold control
+        # -------------------------
+
+        elif c == curses.KEY_RIGHT or c == ord('l'):
+            obj, _, _ = rows[offset + cursor]
             if hasattr(obj, "is_folded") and obj.is_folded:
                 obj.is_folded = False
 
-        elif c == curses.KEY_LEFT:
+        elif c == curses.KEY_LEFT or c == ord('h'):
             obj, _, _ = rows[offset + cursor]
-
             if hasattr(obj, "is_folded") and not obj.is_folded:
 
                 # Find header index BEFORE folding
@@ -184,32 +249,6 @@ def run_ui(scr, diff_path, output_prefix):
                         cursor = max_y - 1
                     else:
                         cursor = header_index - offset
-
-        elif c == ord("c"):
-            write_split(
-                diff,
-                f"{output_prefix}-left.patch",
-                f"{output_prefix}-right.patch"
-            )
-            break
-
-        elif c == curses.KEY_UP:
-            if cursor > 0:
-                cursor -= 1
-            elif offset > 0:
-                offset -= 1
-
-        elif c == curses.KEY_DOWN:
-            if cursor < len(visible) - 1:
-                cursor += 1
-            elif offset + max_y < len(rows):
-                offset += 1
-
-        elif c == curses.KEY_NPAGE:
-            offset = min(offset + max_y, max(0, len(rows) - max_y))
-
-        elif c == curses.KEY_PPAGE:
-            offset = max(offset - max_y, 0)
 
 
 if __name__ == "__main__":
