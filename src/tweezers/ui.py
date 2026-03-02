@@ -8,8 +8,6 @@ from diff_parser import (
     parse_diff,
     parse_hunk_header,
     split_chunk,
-    write_file_block,
-    write_split,
 )
 
 # -----------------------------
@@ -87,7 +85,7 @@ def flatten(diff):
 # Curses UI
 # -----------------------------
 
-def run_ui(scr, diff_path, output_prefix):
+def run_ui(scr, diff):
     curses.noecho()
     curses.cbreak()
     scr.keypad(True)
@@ -98,13 +96,6 @@ def run_ui(scr, diff_path, output_prefix):
     curses.init_pair(1, curses.COLOR_RED, -1)
     curses.init_pair(2, curses.COLOR_GREEN, -1)
     curses.init_pair(4, curses.COLOR_BLUE, -1)
-
-    if len(sys.argv) < 2:
-        print("Usage: tweezers.py <diff_file>")
-        sys.exit(1)
-
-    diff_path = sys.argv[1]
-    diff = parse_diff(diff_path)
 
     offset = 0
     cursor = 0
@@ -236,12 +227,7 @@ def run_ui(scr, diff_path, output_prefix):
                 obj.is_selected = not obj.is_selected
 
         elif c == ord('c'):
-            write_split(
-                diff,
-                f"{output_prefix}-left.patch",
-                f"{output_prefix}-right.patch"
-            )
-            break
+            return
 
         elif c == ord('s'):
             obj, _, _ = rows[offset + cursor]

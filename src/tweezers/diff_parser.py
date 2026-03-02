@@ -79,39 +79,38 @@ class FoldingDiff(FoldingPart):
         return "*** FoldingDiff\n" + "\n".join(self.labels) + "\n" + "\n".join(str(x) for x in self.files)
 
 
-def parse_diff(path):
+def parse_diff(path, text):
     ret = FoldingDiff(path)
 
     current_file = None
     current_chunk = None
 
-    with open(path) as f:
-        for i, line in enumerate(f):
-            line = line.rstrip("\n")
+    for i, line in enumerate(text.split('\n')):
+        line = line.rstrip("\n")
 
-            if line.startswith(PREFIX_DIFF):
-                ret._add_file(line)
-                current_file = ret.files[-1]
-                current_chunk = None
+        if line.startswith(PREFIX_DIFF):
+            ret._add_file(line)
+            current_file = ret.files[-1]
+            current_chunk = None
 
-            elif line.startswith(PREFIX_MINUS) and current_chunk is None:
-                # --- file header
-                ret._add_label(line)
+        elif line.startswith(PREFIX_MINUS) and current_chunk is None:
+            # --- file header
+            ret._add_label(line)
 
-            elif line.startswith(PREFIX_PLUS) and current_chunk is None:
-                # +++ file header
-                ret._add_label(line)
+        elif line.startswith(PREFIX_PLUS) and current_chunk is None:
+            # +++ file header
+            ret._add_label(line)
 
-            elif line.startswith(PREFIX_CHUNK):
-                ret._add_chunk(line)
-                current_chunk = current_file.chunks[-1]
+        elif line.startswith(PREFIX_CHUNK):
+            ret._add_chunk(line)
+            current_chunk = current_file.chunks[-1]
 
+        else:
+            # Inside chunk content
+            if current_chunk is not None:
+                current_chunk._add_line(line)
             else:
-                # Inside chunk content
-                if current_chunk is not None:
-                    current_chunk._add_line(line)
-                else:
-                    ret._add_label(line)
+                ret._add_label(line)
 
     return ret
 
@@ -120,26 +119,17 @@ def parse_diff(path):
 # Writing Split Diffs
 # -----------------------------
 
-def write_split(diff, file_a_path, file_b_path):
-    with open(file_a_path, "w") as fa, open(file_b_path, "w") as fb:
-
-        for file in diff.files:
-
-            has_left = any(not c.is_selected for c in file.chunks)
-            has_right = any(c.is_selected for c in file.chunks)
-
-            if has_left:
-                write_file_block(fa, file, include_selected=False)
-
-            if has_right:
-                write_file_block(fb, file, include_selected=True)
+def build_patch(diff, selected=True):
+    #left_patch = build_patch(diff, selected=False)
+    #right_patch = build_patch(diff, selected=True)
+    out = []
+    for file in diff.files:
+        write_file_block(out, file, include_selected=selected)
+        
+    return "\n".join(out)
 
 
 def write_file_block(out, file, include_selected):
-    """
-    include_selected=True  -> right.patch
-    include_selected=False -> left.patch
-    """
 
     # Write file headers once
     wrote_header = False
@@ -156,7 +146,7 @@ def write_file_block(out, file, include_selected):
         if belongs:
             if not wrote_header:
                 for label in file.labels:
-                    out.write(label + "\n")
+                    out.append(label)
                 wrote_header = True
 
             adj_old_start = old_start + cumulative_delta
@@ -169,10 +159,10 @@ def write_file_block(out, file, include_selected):
                 f"+{adj_new_start},{real_new_len} @@"
             )
 
-            out.write(new_header + "\n")
+            out.append(new_header)
 
             for line in chunk.lines:
-                out.write(line + "\n")
+                out.append(line)
 
             cumulative_delta += delta
 
