@@ -2,11 +2,7 @@
 
 import curses
 import sys
-from diff_parser import (
-    compute_chunk_stats,
-    compute_chunk_stats,
-    parse_diff,
-    parse_hunk_header,
+from tweezers.diff_parser import (
     split_chunk,
     FoldingChunk,
     FoldingFile,

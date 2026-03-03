@@ -2,8 +2,8 @@ import argparse
 import curses
 import subprocess
 import sys
-from diff_parser import build_patch, parse_diff
-from ui import run_ui
+from tweezers.diff_parser import build_patch, parse_diff
+from tweezers.ui import run_ui
 
 
 def ensure_git_repo():
@@ -117,7 +117,7 @@ def main():
     parser.add_argument(
         "--version",
         action="version",
-        version="tweezers 0.2.0"
+        version="tweezers 0.2.2"
     )
     parser.add_argument("--git", nargs="?", const=True)    
     args = parser.parse_args()
