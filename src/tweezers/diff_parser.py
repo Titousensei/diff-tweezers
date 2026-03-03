@@ -30,6 +30,11 @@ class FoldingPart:
     def is_selected_marker(self):
         return self.is_selected
 
+    def toggle_selection(self):
+        pass
+
+    def set_folded(self, value):
+        self.is_folded = value
 
 class FoldingChunk(FoldingPart):
     def __init__(self, label):
@@ -39,6 +44,9 @@ class FoldingChunk(FoldingPart):
     def is_folded_marker(self, level):
         return self.is_folded and level == 1
         
+    def toggle_selection(self):
+        self.is_selected = not self.is_selected
+    
     def _add_line(self, line):
         self.lines.append(line)
 
@@ -60,6 +68,18 @@ class FoldingFile(FoldingPart):
             return 1
         else:
             return 2
+
+    def toggle_selection(self):
+        all_selected = all(c.is_selected for c in self.chunks)
+
+        new_state = not all_selected
+
+        for chunk in self.chunks:
+            chunk.is_selected = new_state
+
+    def set_folded(self, value):
+        for c in self.chunks:
+            c.is_folded = value
 
     def _add_label(self, line):
         self.labels.append(line)

@@ -48,19 +48,31 @@ def get_current_file(rows, offset, diff):
     obj, _, _ = rows[offset]
 
     # If it's a file, return it
-    if hasattr(obj, "chunks"):
+    if isinstance(obj, FoldingFile):
         return obj
         
     return find_parent_file(diff, obj)
 
 
-def toggle_file_selection(file_obj):
-    all_selected = all(c.is_selected for c in file_obj.chunks)
+def move_to_next_file(rows, start_index):
+    start_obj, _, _ = rows[start_index]
+    for i in range(start_index + 1, len(rows)):
+        obj, _, _ = rows[i]
+        if isinstance(obj, FoldingFile) and start_obj != obj:
+            return i
+    return start_index
 
-    new_state = not all_selected
-
-    for chunk in file_obj.chunks:
-        chunk.is_selected = new_state
+    
+def move_to_prev_file(rows, start_index):
+    start_obj, _, _ = rows[start_index]
+    top_i = 0
+    for i in range(start_index - 1, -1, -1):
+        obj, _, _ = rows[i]
+        if isinstance(obj, FoldingFile) and start_obj != obj:
+            top_i = i
+        elif top_i:
+            break
+    return top_i
 
 
 def flatten(diff):
@@ -87,6 +99,20 @@ def flatten(diff):
                     rows.append((chunk, line, 2))
 
     return rows
+
+
+def reposition(new_pos, max_y, total_rows):
+    half = max_y // 2
+
+    offset = max(0, new_pos - half)
+
+    # Clamp so we don't scroll past bottom
+    if offset + max_y > total_rows:
+        offset = max(0, total_rows - max_y)
+
+    cursor = new_pos - offset
+
+    return offset, cursor
 
 # -----------------------------
 # Curses UI
@@ -224,25 +250,28 @@ def run_ui(scr, diff):
             offset = max(0, len(rows) - max_y)
             cursor = min(max_y - 1, len(rows) - 1)
 
+        elif c == ord('}') or c == ord(']'):
+            new_pos = move_to_next_file(rows, offset + cursor)
+            offset, cursor = reposition(new_pos, max_y, len(rows))
+
+        elif c == ord('{') or c == ord('['):
+            new_pos = move_to_prev_file(rows, offset + cursor)
+            offset, cursor = reposition(new_pos, max_y, len(rows))
+
         # -------------------------
         # Actions
         # -------------------------
 
         elif c == ord(' '):
             obj, _, _ = rows[offset + cursor]
-
-            if isinstance(obj, FoldingChunk):
-                obj.is_selected = not obj.is_selected
-
-            elif isinstance(obj, FoldingFile):
-                toggle_file_selection(obj)
+            obj.toggle_selection()
 
         elif c == ord('c'):
             return
 
         elif c == ord('s'):
             obj, _, _ = rows[offset + cursor]
-            if hasattr(obj, "lines"):  # chunk
+            if isinstance(obj, FoldingChunk):
                 parent_file = find_parent_file(diff, obj)
                 split_chunk(parent_file, obj)
         
@@ -252,12 +281,11 @@ def run_ui(scr, diff):
 
         elif c == curses.KEY_RIGHT or c == ord('l'):
             obj, _, _ = rows[offset + cursor]
-            if hasattr(obj, "is_folded") and obj.is_folded:
-                obj.is_folded = False
+            obj.set_folded(False)
 
         elif c == curses.KEY_LEFT or c == ord('h'):
             obj, _, _ = rows[offset + cursor]
-            if hasattr(obj, "is_folded") and not obj.is_folded:
+            if not obj.is_folded:
 
                 # Find header index BEFORE folding
                 header_index = None
@@ -266,7 +294,7 @@ def run_ui(scr, diff):
                         header_index = idx
                         break
 
-                obj.is_folded = True
+                obj.set_folded(True)
 
                 # Recompute rows after folding
                 rows = flatten(diff)
