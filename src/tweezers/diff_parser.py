@@ -24,11 +24,20 @@ class FoldingPart:
         self.is_folded = False
         self.is_selected = False
 
+    def is_folded_marker(self, level):
+        return self.is_folded
+
+    def is_selected_marker(self):
+        return self.is_selected
+
 
 class FoldingChunk(FoldingPart):
     def __init__(self, label):
         super().__init__(label)
         self.lines = []
+        
+    def is_folded_marker(self, level):
+        return self.is_folded and level == 1
         
     def _add_line(self, line):
         self.lines.append(line)
@@ -36,10 +45,21 @@ class FoldingChunk(FoldingPart):
     def __str__(self):
         return "    *** FoldingChunk " + str(self.labels) + "\n    ... " + str(len(self.lines)) + " lines"
 
+
 class FoldingFile(FoldingPart):
     def __init__(self, label):
         super().__init__(label)
         self.chunks = []
+        
+    def is_selected_marker(self):
+        selected = sum(1 for c in self.chunks if c.is_selected)
+
+        if selected == 0:
+            return 0
+        elif selected == len(self.chunks):
+            return 1
+        else:
+            return 2
 
     def _add_label(self, line):
         self.labels.append(line)
@@ -67,7 +87,6 @@ class FoldingDiff(FoldingPart):
             self.files[-1]._add_label(line)
         else:
             self.labels.append(line)
-        
 
     def _add_chunk(self, line):
         self.files[-1]._add_chunk(line)

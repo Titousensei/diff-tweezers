@@ -50,11 +50,30 @@ def apply_selected_patch(patch_text):
     print("Now run: git commit")
 
 
-def run_git_mode():
+def get_commit_diff(commit):
+    result = subprocess.run(
+        ["git", "show", "--format=", commit],
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        print(f"Invalid commit: {commit}")
+        sys.exit(1)
+
+    return result.stdout
+
+
+def run_git_mode(commit = None):
     ensure_git_repo()
 
-    diff_text = get_git_diff()
-    diff = parse_diff("git diff", diff_text)
+    if commit:
+        diff_text = get_commit_diff(commit)
+        source_info = f"git show {commit}"
+    else:
+        diff_text = get_git_diff()
+        source_info = f"git diff"
+    diff = parse_diff(source_info, diff_text)
     curses.wrapper(run_ui, diff)
 
     right_patch = build_patch(diff, selected=True)
@@ -100,12 +119,12 @@ def main():
         action="version",
         version="tweezers 0.2.0"
     )
-    parser.add_argument("--git", action="store_true")
+    parser.add_argument("--git", nargs="?", const=True)    
     args = parser.parse_args()
 
     try:
         if args.git:
-            run_git_mode()
+            run_git_mode(args.git)
         else:
             if not args.diff_file:
                 print("Missing diff file.")

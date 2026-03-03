@@ -8,6 +8,8 @@ from diff_parser import (
     parse_diff,
     parse_hunk_header,
     split_chunk,
+    FoldingChunk,
+    FoldingFile,
 )
 
 # -----------------------------
@@ -52,9 +54,14 @@ def get_current_file(rows, offset, diff):
     return find_parent_file(diff, obj)
 
 
-# -----------------------------
-# Flatten Structured Diff
-# -----------------------------
+def toggle_file_selection(file_obj):
+    all_selected = all(c.is_selected for c in file_obj.chunks)
+
+    new_state = not all_selected
+
+    for chunk in file_obj.chunks:
+        chunk.is_selected = new_state
+
 
 def flatten(diff):
     rows = []
@@ -135,11 +142,7 @@ def run_ui(scr, diff):
             indent = "  " * level
 
             # Fold marker
-            marker = ""
-            if hasattr(obj, "chunks"):  # file
-                marker = FOLD_MARKER if obj.is_folded else UNFOLD_MARKER
-            elif hasattr(obj, "lines") and level == 1:  # chunk header
-                marker = FOLD_MARKER if obj.is_folded else UNFOLD_MARKER
+            marker = FOLD_MARKER if obj.is_folded_marker(level) else UNFOLD_MARKER
 
             text = indent + marker + line
 
@@ -149,12 +152,16 @@ def run_ui(scr, diff):
             style = get_style(line)
             scr.addstr(i + 2, 1, text, style)
 
-            if getattr(obj, "is_selected", False):
+            sel_marker = obj.is_selected_marker()
+            if sel_marker == 1:
                 scr.addstr(i + 2, 0, "=")
+            elif sel_marker == 2:
+                scr.addstr(i + 2, 0, ":")
 
         status = (
-            f"[space] select  [tab] fold  [c] cut  [q] quit"
-            f"    Selected chunks: {selected_count}"
+            f"[space] select  [c] cut  [q] quit"
+            f"    Selected: {selected_count}"
+            f"    {diff.labels}"
         )
 
         scr.addstr(0, 2, status[:max_x])
@@ -223,8 +230,12 @@ def run_ui(scr, diff):
 
         elif c == ord(' '):
             obj, _, _ = rows[offset + cursor]
-            if hasattr(obj, "lines"):
+
+            if isinstance(obj, FoldingChunk):
                 obj.is_selected = not obj.is_selected
+
+            elif isinstance(obj, FoldingFile):
+                toggle_file_selection(obj)
 
         elif c == ord('c'):
             return
