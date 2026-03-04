@@ -5,8 +5,27 @@ import curses
 import re
 import sys
 
-HUNK_RE = re.compile(r"@@ -(\d+),(\d+) \+(\d+),(\d+) @@")
+HUNK_RE = re.compile(
+    r"@@ -(?P<old_start>\d+)(?:,(?P<old_len>\d+))? "
+    r"\+(?P<new_start>\d+)(?:,(?P<new_len>\d+))? @@"
+)
 
+def parse_hunk_header(header):
+    m = HUNK_RE.match(header.strip())
+    if not m:
+        raise ValueError(f"Invalid hunk header: {header}")
+
+    old_start = int(m.group("old_start"))
+    new_start = int(m.group("new_start"))
+
+    old_len = m.group("old_len")
+    new_len = m.group("new_len")
+
+    # If length omitted → default to 1
+    old_len = int(old_len) if old_len else 1
+    new_len = int(new_len) if new_len else 1
+
+    return old_start, old_len, new_start, new_len
 
 # Diff struct:
 # - file ("diff", "---", "+++")
@@ -212,10 +231,21 @@ def write_file_block(out, file, include_selected):
 
 
 def parse_hunk_header(header):
-    m = HUNK_RE.search(header)
+    m = HUNK_RE.match(header.strip())
     if not m:
         raise ValueError(f"Invalid hunk header: {header}")
-    return tuple(map(int, m.groups()))
+
+    old_start = int(m.group("old_start"))
+    new_start = int(m.group("new_start"))
+
+    old_len = m.group("old_len")
+    new_len = m.group("new_len")
+
+    # If length omitted → default to 1
+    old_len = int(old_len) if old_len else 1
+    new_len = int(new_len) if new_len else 1
+
+    return old_start, old_len, new_start, new_len
 
 
 def compute_chunk_stats(chunk):

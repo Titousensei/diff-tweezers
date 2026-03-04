@@ -67,12 +67,12 @@ def get_commit_diff(commit):
 def run_git_mode(commit = None):
     ensure_git_repo()
 
-    if commit:
-        diff_text = get_commit_diff(commit)
-        source_info = f"git show {commit}"
-    else:
+    if commit is True:
         diff_text = get_git_diff()
         source_info = f"git diff"
+    else:
+        diff_text = get_commit_diff(commit)
+        source_info = f"git show {commit}"
     diff = parse_diff(source_info, diff_text)
     curses.wrapper(run_ui, diff)
 
