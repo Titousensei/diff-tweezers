@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "diff-tweezers"
-version = "0.2.2"
+dynamic = ["version"]
 description = "Interactive terminal diff chunk splitter"
 authors = [
   { name="Eric Gaudet", email="gaudeteric@email.com" }
@@ -20,3 +20,6 @@ tweezers = "tweezers.cli:main"
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ["tweezers"]
+
+[tool.setuptools.dynamic]
+version = {attr = "tweezers.__version__"}

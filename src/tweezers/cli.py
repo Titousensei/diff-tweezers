@@ -2,6 +2,7 @@ import argparse
 import curses
 import subprocess
 import sys
+from importlib.metadata import version
 from tweezers.diff_parser import build_patch, parse_diff
 from tweezers.ui import run_ui
 
@@ -64,7 +65,7 @@ def get_commit_diff(commit):
     return result.stdout
 
 
-def run_git_mode(commit = None):
+def run_git_mode(commit, save_to_files):
     ensure_git_repo()
 
     if commit is True:
@@ -82,6 +83,10 @@ def run_git_mode(commit = None):
         print("No hunks selected.")
         return
 
+    if save_to_files:
+        with open("right.patch", "w") as f:
+            f.write(right_patch)
+    
     apply_selected_patch(right_patch + '\n')
 
 
@@ -114,17 +119,19 @@ def main():
         default="split",
         help="Output prefix (default: split)"
     )
+    parser.add_argument("--save", action="store_true",
+                    help="Save left.patch and right.patch")
     parser.add_argument(
         "--version",
         action="version",
-        version="tweezers 0.2.2"
+        version=f"%(prog)s {version('diff-tweezers')}",
     )
     parser.add_argument("--git", nargs="?", const=True)    
     args = parser.parse_args()
 
     try:
         if args.git:
-            run_git_mode(args.git)
+            run_git_mode(args.git, args.save)
         else:
             if not args.diff_file:
                 print("Missing diff file.")

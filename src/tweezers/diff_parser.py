@@ -184,7 +184,7 @@ def build_patch(diff, selected=True):
     for file in diff.files:
         write_file_block(out, file, include_selected=selected)
         
-    return "\n".join(out)
+    return "\n".join(out) + "\n"
 
 
 def write_file_block(out, file, include_selected):
