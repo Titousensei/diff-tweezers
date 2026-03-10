@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 
 from collections import namedtuple
-import curses
 import re
 import sys
 

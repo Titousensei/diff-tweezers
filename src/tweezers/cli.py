@@ -37,7 +37,8 @@ def get_git_diff():
     return result.stdout        
     
 
-def apply_selected_patch(patch_text):
+def apply_patch_to_staging(patch_text):
+    """Apply patch to staging area (index). Used for staging working tree changes."""
     result = subprocess.run(
         ["git", "apply", "--cached", "-"],
         input=patch_text.encode(),
@@ -49,6 +50,21 @@ def apply_selected_patch(patch_text):
 
     print("Selected changes staged.")
     print("Now run: git commit")
+
+
+def apply_patch_to_worktree(patch_text):
+    """Apply patch to working tree. Used for cherry-picking from commits."""
+    result = subprocess.run(
+        ["git", "apply", "-"],
+        input=patch_text.encode(),
+    )
+
+    if result.returncode != 0:
+        print("Failed to apply patch.")
+        sys.exit(1)
+
+    print("Selected changes applied to working tree.")
+    print("Run: git add -p  (to stage selectively)")
 
 
 def get_commit_diff(commit):
@@ -69,11 +85,16 @@ def run_git_mode(commit, save_to_files):
     ensure_git_repo()
 
     if commit is True:
+        # --git without param: stage hunks from working tree (like git add -p)
         diff_text = get_git_diff()
-        source_info = f"git diff"
+        source_info = "git diff"
+        apply_to_staging = True
     else:
+        # --git <commit>: cherry-pick hunks from a commit to working tree
         diff_text = get_commit_diff(commit)
         source_info = f"git show {commit}"
+        apply_to_staging = False
+
     diff = parse_diff(source_info, diff_text)
     curses.wrapper(run_ui, diff)
 
@@ -86,8 +107,11 @@ def run_git_mode(commit, save_to_files):
     if save_to_files:
         with open("right.patch", "w") as f:
             f.write(right_patch)
-    
-    apply_selected_patch(right_patch + '\n')
+
+    if apply_to_staging:
+        apply_patch_to_staging(right_patch + '\n')
+    else:
+        apply_patch_to_worktree(right_patch + '\n')
 
 
 def run_file_mode(diff_path):
