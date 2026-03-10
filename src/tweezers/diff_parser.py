@@ -192,14 +192,15 @@ def write_file_block(out, file, include_selected):
     # Write file headers once
     wrote_header = False
 
-    cumulative_delta = 0
+    # Track delta from SKIPPED hunks to adjust new_start for subsequent hunks
+    skipped_delta = 0
 
     for chunk in file.chunks:
 
         belongs = chunk.is_selected == include_selected
 
         original_header = chunk.labels[0]
-        old_start, old_len, new_start, new_len = parse_hunk_header(original_header)
+        old_start, _, new_start, _ = parse_hunk_header(original_header)
 
         if belongs:
             if not wrote_header:
@@ -207,13 +208,14 @@ def write_file_block(out, file, include_selected):
                     out.append(label)
                 wrote_header = True
 
-            adj_old_start = old_start + cumulative_delta
-            adj_new_start = new_start + cumulative_delta
+            # old_start is unchanged - it always refers to the original file
+            # new_start needs adjustment for skipped hunks' deltas
+            adj_new_start = new_start - skipped_delta
 
             real_old_len, real_new_len, delta = compute_chunk_stats(chunk)
 
             new_header = (
-                f"@@ -{adj_old_start},{real_old_len} "
+                f"@@ -{old_start},{real_old_len} "
                 f"+{adj_new_start},{real_new_len} @@"
             )
 
@@ -222,12 +224,10 @@ def write_file_block(out, file, include_selected):
             for line in chunk.lines:
                 out.append(line)
 
-            cumulative_delta += delta
-
         else:
-            # Important: do NOT change cumulative_delta
-            # because this chunk does not exist in this patch.
-            pass
+            # Track delta from skipped hunks to adjust subsequent new_start values
+            _, _, delta = compute_chunk_stats(chunk)
+            skipped_delta += delta
 
 
 def parse_hunk_header(header):
