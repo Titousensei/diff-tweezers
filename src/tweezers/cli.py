@@ -114,6 +114,41 @@ def run_git_mode(commit, save_to_files):
         apply_patch_to_worktree(right_patch + '\n')
 
 
+def run_revert_mode(commit, save_to_files):
+    """Revert mode: stage/apply reverted hunks (undo selected changes)."""
+    ensure_git_repo()
+
+    if commit is True:
+        # --revert without param: revert hunks from working tree to staging
+        diff_text = get_git_diff()
+        source_info = "git diff (revert)"
+        apply_to_staging = True
+    else:
+        # --revert <commit>: revert hunks from a commit to working tree
+        diff_text = get_commit_diff(commit)
+        source_info = f"git show {commit} (revert)"
+        apply_to_staging = False
+
+    diff = parse_diff(source_info, diff_text)
+    curses.wrapper(run_ui, diff)
+
+    # Build a reversed patch for the selected hunks
+    reverse_patch = build_patch(diff, selected=True, reverse=True)
+
+    if not reverse_patch.strip():
+        print("No hunks selected.")
+        return
+
+    if save_to_files:
+        with open("revert.patch", "w") as f:
+            f.write(reverse_patch)
+
+    if apply_to_staging:
+        apply_patch_to_staging(reverse_patch + '\n')
+    else:
+        apply_patch_to_worktree(reverse_patch + '\n')
+
+
 def run_file_mode(diff_path):
     with open(diff_path) as f:
         diff_text = f.read()
@@ -150,11 +185,16 @@ def main():
         action="version",
         version=f"%(prog)s {version('diff-tweezers')}",
     )
-    parser.add_argument("--git", nargs="?", const=True)    
+    parser.add_argument("--git", nargs="?", const=True,
+                        help="Stage hunks from working tree, or cherry-pick from commit")
+    parser.add_argument("--revert", nargs="?", const=True,
+                        help="Like --git but stage/apply reverted hunks (undo selected changes)")
     args = parser.parse_args()
 
     try:
-        if args.git:
+        if args.revert:
+            run_revert_mode(args.revert, args.save)
+        elif args.git:
             run_git_mode(args.git, args.save)
         else:
             if not args.diff_file:

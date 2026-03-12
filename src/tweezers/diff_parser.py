@@ -182,17 +182,35 @@ def parse_diff(path, text):
 # Writing Split Diffs
 # -----------------------------
 
-def build_patch(diff, selected=True):
+def build_patch(diff, selected=True, reverse=False):
     #left_patch = build_patch(diff, selected=False)
     #right_patch = build_patch(diff, selected=True)
     out = []
     for file in diff.files:
-        write_file_block(out, file, include_selected=selected)
-        
+        write_file_block(out, file, include_selected=selected, reverse=reverse)
+
     return "\n".join(out) + "\n"
 
 
-def write_file_block(out, file, include_selected):
+def reverse_file_label(label):
+    """Swap --- and +++ prefixes in file headers."""
+    if label.startswith("--- "):
+        return "+++ " + label[4:]
+    elif label.startswith("+++ "):
+        return "--- " + label[4:]
+    return label
+
+
+def reverse_line(line):
+    """Swap + and - prefixes in hunk lines."""
+    if line.startswith("-"):
+        return "+" + line[1:]
+    elif line.startswith("+"):
+        return "-" + line[1:]
+    return line
+
+
+def write_file_block(out, file, include_selected, reverse=False):
 
     # Write file headers once
     wrote_header = False
@@ -210,7 +228,10 @@ def write_file_block(out, file, include_selected):
         if belongs:
             if not wrote_header:
                 for label in file.labels:
-                    out.append(label)
+                    if reverse:
+                        out.append(reverse_file_label(label))
+                    else:
+                        out.append(label)
                 wrote_header = True
 
             # old_start is unchanged - it always refers to the original file
@@ -219,15 +240,25 @@ def write_file_block(out, file, include_selected):
 
             real_old_len, real_new_len, delta = compute_chunk_stats(chunk)
 
-            new_header = (
-                f"@@ -{old_start},{real_old_len} "
-                f"+{adj_new_start},{real_new_len} @@"
-            )
+            if reverse:
+                # For reverse patch: swap old and new
+                new_header = (
+                    f"@@ -{adj_new_start},{real_new_len} "
+                    f"+{old_start},{real_old_len} @@"
+                )
+            else:
+                new_header = (
+                    f"@@ -{old_start},{real_old_len} "
+                    f"+{adj_new_start},{real_new_len} @@"
+                )
 
             out.append(new_header)
 
             for line in chunk.lines:
-                out.append(line)
+                if reverse:
+                    out.append(reverse_line(line))
+                else:
+                    out.append(line)
 
         else:
             # Track delta from skipped hunks to adjust subsequent new_start values
