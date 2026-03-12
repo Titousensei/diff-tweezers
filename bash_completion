@@ -1,0 +1,23 @@
+_tweezers_completion() {
+    local cur prev
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    # Complete --git or --revert with git refs (branches, tags, commits)
+    if [[ "$prev" == "--git" || "$prev" == "--revert" ]]; then
+        COMPREPLY=( $(compgen -W "$(git for-each-ref --format='%(refname:short)' 2>/dev/null)" -- "$cur") )
+        return
+    fi
+
+    # Complete options
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "--git --revert --save --version --help" -- "$cur") )
+        return
+    fi
+
+    # Default: file completion
+    COMPREPLY=( $(compgen -f -- "$cur") )
+}
+
+complete -F _tweezers_completion tweezers
