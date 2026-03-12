@@ -142,7 +142,13 @@ def parse_diff(path, text):
     current_file = None
     current_chunk = None
 
-    for i, line in enumerate(text.split('\n')):
+    lines = text.split('\n')
+    # Remove trailing empty strings that result from trailing newlines
+    # (text.split('\n') on "...\n" produces ['...', ''])
+    while lines and lines[-1] == '':
+        lines.pop()
+
+    for i, line in enumerate(lines):
         line = line.rstrip("\n")
 
         if line.startswith(PREFIX_DIFF):

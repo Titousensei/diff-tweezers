@@ -440,6 +440,58 @@ diff --git a/example.py b/example.py
         assert "added_C" not in patch
 
 
+class TestTrailingNewlines:
+    """Test that trailing newlines in input don't add extra lines to chunks."""
+
+    # Diff ending with trailing newline (common from git show/diff output)
+    DIFF_WITH_TRAILING_NEWLINE = """\
+diff --git a/example.py b/example.py
+--- a/example.py
++++ b/example.py
+@@ -1,5 +1,6 @@
+ line1
+ line2
++added_line
+ line3
+ line4
+ line5
+"""
+
+    def test_trailing_newline_not_added_to_chunk(self):
+        """Trailing newline in input should not add empty line to last chunk."""
+        diff = parse_diff("test", self.DIFF_WITH_TRAILING_NEWLINE)
+
+        # Should have exactly one chunk
+        assert len(diff.files) == 1
+        assert len(diff.files[0].chunks) == 1
+
+        chunk = diff.files[0].chunks[0]
+        # Count lines: 5 context + 1 addition = 6 lines
+        assert len(chunk.lines) == 6
+
+        # Last line should be " line5", not empty
+        assert chunk.lines[-1] == " line5"
+
+    def test_hunk_header_counts_correct_with_trailing_newline(self):
+        """Hunk header line counts should not include trailing empty line."""
+        diff = parse_diff("test", self.DIFF_WITH_TRAILING_NEWLINE)
+        diff.files[0].chunks[0].is_selected = True
+
+        patch = build_patch(diff, selected=True)
+
+        # Should have correct counts: old=5, new=6
+        assert "@@ -1,5 +1,6 @@" in patch
+
+    def test_multiple_trailing_newlines(self):
+        """Multiple trailing newlines should all be ignored."""
+        diff_text = self.DIFF_WITH_TRAILING_NEWLINE + "\n\n"
+        diff = parse_diff("test", diff_text)
+
+        chunk = diff.files[0].chunks[0]
+        assert len(chunk.lines) == 6
+        assert chunk.lines[-1] == " line5"
+
+
 class TestGitApplyIntegration:
     """Integration tests that verify patches actually apply with git."""
 
