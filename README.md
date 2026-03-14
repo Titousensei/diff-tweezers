@@ -2,6 +2,8 @@
 
 Interactive terminal tool for splitting unified diffs by chunk.
 
+![example](/assets/Screenshot_tweezers.png)
+
 ## Install
 
 ```bash
